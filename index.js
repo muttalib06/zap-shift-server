@@ -122,6 +122,12 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/users", async (req, res) => {
+      const cursor = userCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     //post API
 
     app.post("/parcels", async (req, res) => {
@@ -168,6 +174,30 @@ async function run() {
         },
       };
       const result = await riderCollection.updateOne(query, updateDoc);
+
+      if (status === "Approved") {
+        const updateRider = {
+          $set: {
+            role: "Rider",
+          },
+        };
+
+        const resultRider = await riderCollection.updateOne(query, updateRider);
+      }
+      res.send(result);
+    });
+
+    app.patch("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const roleInfo = req.body.role;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: roleInfo,
+        },
+      };
+
+      const result = await userCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
