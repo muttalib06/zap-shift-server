@@ -73,6 +73,8 @@ async function run() {
     const database = client.db("zapShift");
     const parcelCollection = database.collection("parcels");
     const paymentCollection = database.collection("payments");
+    const userCollection = database.collection("users");
+    const riderCollection = database.collection("riders");
 
     //get API
 
@@ -86,7 +88,7 @@ async function run() {
       if (email) {
         query.senderEmail = email;
       }
-      const cursor = parcelCollection.find(query);
+      const cursor = parcelCollection.find(query).sort({ createdAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -113,11 +115,59 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+
+    app.get("/riders", async (req, res) => {
+      const cursor = riderCollection.find().sort({ createdAt: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     //post API
 
     app.post("/parcels", async (req, res) => {
       const parcel = req.body;
       const result = await parcelCollection.insertOne(parcel);
+      res.send(result);
+    });
+
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      user.role = "user";
+      user.createdAt = new Date();
+      const email = user.email;
+
+      const userExits = await userCollection.findOne({ email: email });
+
+      if (userExits) {
+        return res.send({ message: "This user already exits" });
+      }
+
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.post("/riders", async (req, res) => {
+      const rider = req.body;
+      rider.status = "Pending";
+      rider.createdAt = new Date();
+
+      const result = await riderCollection.insertOne(rider);
+      res.send(result);
+    });
+
+    // update api;
+
+    app.patch("/riders/:id", async (req, res) => {
+      const status = req.body.status;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      const updateDoc = {
+        $set: {
+          status: status,
+        },
+      };
+      const result = await riderCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
@@ -127,6 +177,13 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await parcelCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    app.delete("/riders/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await riderCollection.deleteOne(query);
       res.send(result);
     });
 
