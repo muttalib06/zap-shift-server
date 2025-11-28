@@ -76,6 +76,20 @@ async function run() {
     const userCollection = database.collection("users");
     const riderCollection = database.collection("riders");
 
+    // verify admin;
+    // Must be used after verifyFBToken middleware;
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded_email;
+      const query = { email };
+      const user = await userCollection.findOne(query);
+      if (!user || user.role !== "Admin") {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+
+      next();
+    };
+
     //get API
 
     app.get("/", (req, res) => {
@@ -128,6 +142,13 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/user/:email/role", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await userCollection.findOne(query);
+      res.send({ role: user?.role || "user" });
+    });
+
     //post API
 
     app.post("/parcels", async (req, res) => {
@@ -163,7 +184,9 @@ async function run() {
 
     // update api;
 
-    app.patch("/riders/:id", async (req, res) => {
+    // set rider status;
+
+    app.patch("/riders/:id", verifyFBToken, verifyAdmin, async (req, res) => {
       const status = req.body.status;
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -187,7 +210,9 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/:id", async (req, res) => {
+    // set user role
+
+    app.patch("/users/:id", verifyFBToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const roleInfo = req.body.role;
       const query = { _id: new ObjectId(id) };
