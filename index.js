@@ -98,7 +98,11 @@ async function run() {
 
     app.get("/parcels", async (req, res) => {
       const email = req.query.email;
+      const deliveryStatus = req.query.deliveryStatus;
       const query = {};
+      if (deliveryStatus) {
+        query.deliveryStatus = deliveryStatus;
+      }
       if (email) {
         query.senderEmail = email;
       }
@@ -131,13 +135,35 @@ async function run() {
     });
 
     app.get("/riders", async (req, res) => {
-      const cursor = riderCollection.find().sort({ createdAt: -1 });
+      const { status, district, workStatus } = req.query;
+      const query = {};
+      if (status) {
+        query.status = status;
+      }
+
+      if (district) {
+        query.district = district;
+      }
+
+      if (workStatus) {
+        query.workStatus = workStatus;
+      }
+      const cursor = riderCollection.find(query).sort({ createdAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
     });
 
     app.get("/users", async (req, res) => {
-      const cursor = userCollection.find();
+      const searchText = req.query.searchText;
+      const query = {};
+      if (searchText) {
+        // query.displayName = { $regex: searchText,$options:"i" };
+        query.$or = [
+          { displayName: { $regex: searchText, $options: "i" } },
+          { email: { $regex: searchText, $options: "i" } },
+        ];
+      }
+      const cursor = userCollection.find(query).limit(6);
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -178,11 +204,45 @@ async function run() {
       rider.status = "Pending";
       rider.createdAt = new Date();
 
+      // update user role;
+      const email = req.body.email;
+      const query = { email };
+      const updateUserRoleDoc = {
+        $set: {
+          role: "Rider",
+        },
+      };
+
+      const updateUserRoleResult = await userCollection.updateOne(
+        query,
+        updateUserRoleDoc
+      );
+
       const result = await riderCollection.insertOne(rider);
       res.send(result);
     });
 
     // update api;
+
+    // update parcels;
+
+    app.patch("/parcels/:id", async (req, res) => {
+      const { riderId, riderName, riderEmail } = req.body;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      const updateRiderDoc = {
+        $set: {
+          deliveryStatus: "delivery assigned",
+          riderId: riderId,
+          riderName: riderName,
+          riderEmail: riderEmail,
+        },
+      };
+
+      const result = await parcelCollection.updateOne(query, updateRiderDoc);
+      res.send(result);
+    });
 
     // set rider status;
 
@@ -194,6 +254,7 @@ async function run() {
       const updateDoc = {
         $set: {
           status: status,
+          workStatus: "Available",
         },
       };
       const result = await riderCollection.updateOne(query, updateDoc);
@@ -320,6 +381,7 @@ async function run() {
             $set: {
               paymentStatus: "paid",
               paymentDate: new Date(),
+              deliveryStatus: "pending-pickup",
               transactionId: session.payment_intent,
               trackingId: trackingId,
             },
